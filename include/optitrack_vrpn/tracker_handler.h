@@ -49,6 +49,9 @@
 
 #include <memory>
 
+#include <optitrack_vrpn/state_estimator_lcmt.hpp>
+#include "lcm/lcm-cpp.hpp"
+
 namespace optitrack_vrpn
 {
 
@@ -98,7 +101,9 @@ private:
   ros::Publisher enu_pub_;
   ros::Publisher enu_ode_pub_;
   ros::Publisher ned_pub_;
-  tf2_ros::TransformBroadcaster tf_broadcaster_;
+    lcm::LCM robot_states_lcm_publisher_;
+    state_estimator_lcmt robot_state_estimator_lcm_;
+    tf2_ros::TransformBroadcaster tf_broadcaster_;
 
   geometry_msgs::PoseStamped enu_msg_last_;
     ros::Time stamp_last_;

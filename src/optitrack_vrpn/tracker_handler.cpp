@@ -40,6 +40,16 @@
 #include <cmath>
 #include <sstream>
 
+typedef int64_t s64;
+
+/*!
+ * Get the LCM URL with desired TTL.
+ */
+std::string getLcmUrl(s64 ttl) {
+    assert(ttl >= 0 && ttl <= 255);
+    return "udpm://239.255.76.67:7667?ttl=" + std::to_string(ttl);
+}
+
 namespace optitrack_vrpn
 {
 
@@ -53,7 +63,8 @@ TrackerHandler::TrackerHandler(const std::string& name,
   tf_child_frame_ned_(name + "_ned"),
   connection_(connection),
   time_manager_(time_manager),
-  tracker_((name + "@" + options.host).c_str(), connection_.get())
+  tracker_((name + "@" + options.host).c_str(), connection_.get()),
+  robot_states_lcm_publisher_(getLcmUrl(255))
 {
     enu_msg_last_.pose.orientation.w = 1.0;
     enu_msg_last_.pose.orientation.x = 0.0;
@@ -73,6 +84,24 @@ TrackerHandler::TrackerHandler(const std::string& name,
     ned_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(topic_name + "_ned", 1);
 
   tracker_.register_change_handler(this, &TrackerHandler::position_callback_wrapper);
+
+    for (int i = 0; i < 3; ++i) {
+        robot_state_estimator_lcm_.p[i] = 0.0;
+        robot_state_estimator_lcm_.vWorld[i] = 0.0;
+        robot_state_estimator_lcm_.vBody[i] = 0.0;
+        robot_state_estimator_lcm_.rpy[i] = 0.0;
+        robot_state_estimator_lcm_.omegaBody[i] = 0.0;
+        robot_state_estimator_lcm_.omegaWorld[i] = 0.0;
+        robot_state_estimator_lcm_.foot_p1[i] = 0.0;
+        robot_state_estimator_lcm_.foot_p2[i] = 0.0;
+        robot_state_estimator_lcm_.foot_p3[i] = 0.0;
+        robot_state_estimator_lcm_.foot_p4[i] = 0.0;
+    }
+    robot_state_estimator_lcm_.p[2] = 0.38;
+    for (int i = 0; i < 4; ++i) {
+        robot_state_estimator_lcm_.quat[i] = 0.0;
+    }
+    robot_state_estimator_lcm_.quat[3] = 1.0;
 }
 
 void TrackerHandler::position_callback_wrapper(void *userData, vrpn_TRACKERCB info)
@@ -147,6 +176,22 @@ void TrackerHandler::position_callback(const vrpn_TRACKERCB& info)
     enu_ode_msg.twist.twist.linear.z = (enu_ode_msg.pose.pose.position.z - enu_msg_last_.pose.position.z) / stamp_delta_;
     enu_ode_pub_.publish(enu_ode_msg);
 
+    robot_state_estimator_lcm_.p[0] = enu_ode_msg.pose.pose.position.x;
+    robot_state_estimator_lcm_.p[1] = enu_ode_msg.pose.pose.position.y;
+    robot_state_estimator_lcm_.p[2] = enu_ode_msg.pose.pose.position.z;
+    robot_state_estimator_lcm_.quat[0] = enu_ode_msg.pose.pose.orientation.x;
+    robot_state_estimator_lcm_.quat[1] = enu_ode_msg.pose.pose.orientation.y;
+    robot_state_estimator_lcm_.quat[2] = enu_ode_msg.pose.pose.orientation.z;
+    robot_state_estimator_lcm_.quat[3] = enu_ode_msg.pose.pose.orientation.w;
+
+    robot_state_estimator_lcm_.vWorld[0] = enu_ode_msg.twist.twist.linear.x;
+    robot_state_estimator_lcm_.vWorld[1] = enu_ode_msg.twist.twist.linear.y;
+    robot_state_estimator_lcm_.vWorld[2] = enu_ode_msg.twist.twist.linear.z;
+    robot_state_estimator_lcm_.omegaWorld[0] = 0.0;
+    robot_state_estimator_lcm_.omegaWorld[1] = 0.0;
+    robot_state_estimator_lcm_.omegaWorld[2] = 0.0;
+
+    robot_states_lcm_publisher_.publish("robot_states_optitrack", &robot_state_estimator_lcm_);
     stamp_last_ = stamp;
     enu_msg_last_ = enu_msg;
 }
