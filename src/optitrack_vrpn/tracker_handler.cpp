@@ -55,12 +55,22 @@ TrackerHandler::TrackerHandler(const std::string& name,
   time_manager_(time_manager),
   tracker_((name + "@" + options.host).c_str(), connection_.get())
 {
-  rfu_to_flu_.setRPY(0.0, 0.0, M_PI_2); // rotate pi/2 (90deg) about z-axis
+    enu_msg_last_.pose.orientation.w = 1.0;
+    enu_msg_last_.pose.orientation.x = 0.0;
+    enu_msg_last_.pose.orientation.x = 0.0;
+    enu_msg_last_.pose.orientation.x = 0.0;
+    enu_msg_last_.pose.position.x = 0.0;
+    enu_msg_last_.pose.position.y = 0.0;
+    enu_msg_last_.pose.position.z = 0.0;
+    stamp_last_ = ros::Time::now();
+
+    rfu_to_flu_.setRPY(0.0, 0.0, M_PI_2); // rotate pi/2 (90deg) about z-axis
 
   std::string topic_name = sanitize_name(name_);
 
   enu_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(topic_name + "_enu", 1);
-  ned_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(topic_name + "_ned", 1);
+    enu_ode_pub_ = nh_.advertise<nav_msgs::Odometry>(topic_name + "_odo_enu", 1);
+    ned_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(topic_name + "_ned", 1);
 
   tracker_.register_change_handler(this, &TrackerHandler::position_callback_wrapper);
 }
@@ -117,6 +127,28 @@ void TrackerHandler::position_callback(const vrpn_TRACKERCB& info)
   ned_msg.pose.orientation.w =  info.quat[VRPNIndex::W];
   ned_pub_.publish(ned_msg);
   send_transform(ned_msg, tf_child_frame_ned_);
+
+    nav_msgs::Odometry enu_ode_msg;
+    enu_ode_msg.header.stamp = stamp;
+    enu_ode_msg.header.frame_id = options_.frame;
+
+    enu_ode_msg.pose.pose.position.x =  info.pos[VRPNIndex::Z];
+    enu_ode_msg.pose.pose.position.y =  info.pos[VRPNIndex::X];
+    enu_ode_msg.pose.pose.position.z =  info.pos[VRPNIndex::Y];
+
+    enu_ode_msg.pose.pose.orientation.x =  quat.x();
+    enu_ode_msg.pose.pose.orientation.y =  quat.y();
+    enu_ode_msg.pose.pose.orientation.z =  quat.z();
+    enu_ode_msg.pose.pose.orientation.w =  quat.w();
+
+    double stamp_delta_ = stamp.toSec() - stamp_last_.toSec();
+    enu_ode_msg.twist.twist.linear.x = (enu_ode_msg.pose.pose.position.x - enu_msg_last_.pose.position.x) / stamp_delta_;
+    enu_ode_msg.twist.twist.linear.y = (enu_ode_msg.pose.pose.position.y - enu_msg_last_.pose.position.y) / stamp_delta_;
+    enu_ode_msg.twist.twist.linear.z = (enu_ode_msg.pose.pose.position.z - enu_msg_last_.pose.position.z) / stamp_delta_;
+    enu_ode_pub_.publish(enu_ode_msg);
+
+    stamp_last_ = stamp;
+    enu_msg_last_ = enu_msg;
 }
 
 void TrackerHandler::send_transform(const geometry_msgs::PoseStamped &pose, const std::string &child_frame)

@@ -38,6 +38,7 @@
 
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <nav_msgs/Odometry.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2/LinearMath/Quaternion.h>
 
@@ -95,10 +96,15 @@ private:
 
   ros::NodeHandle nh_;
   ros::Publisher enu_pub_;
+  ros::Publisher enu_ode_pub_;
   ros::Publisher ned_pub_;
   tf2_ros::TransformBroadcaster tf_broadcaster_;
 
-  ros::Timer mainloop_timer_;
+  geometry_msgs::PoseStamped enu_msg_last_;
+    ros::Time stamp_last_;
+
+
+    ros::Timer mainloop_timer_;
 
   tf2::Quaternion rfu_to_flu_; //!< transforms body rotation from right-front-up to forward-left-up
 
