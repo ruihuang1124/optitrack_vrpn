@@ -42,7 +42,7 @@ namespace optitrack_vrpn
 OptiTrackVRPN::OptiTrackVRPN() :
   nh_private_("~")
 {
-  nh_private_.param<std::string>("host", host_, "192.168.1.186");
+  nh_private_.param<std::string>("host", host_, "192.168.151.100");
   nh_private_.param<int>("update_rate", update_rate_, 500);
   nh_private_.param<std::string>("frame", frame_, "optitrack");
   ned_frame_ = frame_ + "_ned";
